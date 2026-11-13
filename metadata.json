@@ -1,0 +1,6 @@
+{
+  "name": "SafBundle",
+  "description": "SafBundle — Safaricom data bundles and airtime purchasing platform for Kenya with M-Pesa Daraja and automated supplier integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,234 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Safaricom bundle or airtime catalog item managed by admins.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "category": { "type": "string", "enum": ["daily", "weekly", "monthly", "special", "airtime"] },
+        "dataAllocation": { "type": "string", "maxLength": 64 },
+        "validityLabel": { "type": "string", "maxLength": 64 },
+        "description": { "type": "string", "maxLength": 400 },
+        "priceKes": { "type": "number" },
+        "supplierSku": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "isActive": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "isSample": { "type": "boolean" },
+        "sortOrder": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category", "priceKes", "supplierSku", "isActive", "sortOrder"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer profile keyed by normalized Kenyan MSISDN (PII restricted).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "phone": { "type": "string", "minLength": 12, "maxLength": 15, "pattern": "^254[17][0-9]{8}$" },
+        "totalOrders": { "type": "number" },
+        "totalSpentKes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastOrderAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "phone", "totalOrders", "totalSpentKes", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer bundle or airtime order record with tracking token and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderRef": { "type": "string", "minLength": 6, "maxLength": 32 },
+        "trackingToken": { "type": "string", "minLength": 16, "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "productId": { "type": "string", "maxLength": 128 },
+        "productName": { "type": "string", "maxLength": 120 },
+        "category": { "type": "string", "enum": ["daily", "weekly", "monthly", "special", "airtime"] },
+        "supplierSku": { "type": "string", "maxLength": 80 },
+        "recipientPhone": { "type": "string", "minLength": 12, "maxLength": 15, "pattern": "^254[17][0-9]{8}$" },
+        "mpesaPhone": { "type": "string", "maxLength": 15 },
+        "amountKes": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["stk_push", "till_paybill"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "initiated", "paid", "failed", "cancelled"] },
+        "deliveryStatus": { "type": "string", "enum": ["awaiting_payment", "pending", "processing", "delivered", "failed"] },
+        "mpesaReceiptNumber": { "type": "string", "maxLength": 64 },
+        "checkoutRequestId": { "type": "string", "maxLength": 128 },
+        "customerSubmittedRef": { "type": "string", "maxLength": 64 },
+        "supplierTransactionId": { "type": "string", "maxLength": 128 },
+        "failureReason": { "type": "string", "maxLength": 300 },
+        "idempotencyKey": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "orderRef",
+        "trackingToken",
+        "productId",
+        "productName",
+        "category",
+        "supplierSku",
+        "recipientPhone",
+        "amountKes",
+        "paymentMethod",
+        "paymentStatus",
+        "deliveryStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "M-Pesa payment attempt or confirmed transaction record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "orderRef": { "type": "string", "maxLength": 32 },
+        "method": { "type": "string", "enum": ["stk_push", "till_paybill"] },
+        "payerPhone": { "type": "string", "maxLength": 20 },
+        "amountKes": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "initiated", "paid", "failed", "cancelled"] },
+        "merchantRequestId": { "type": "string", "maxLength": 128 },
+        "checkoutRequestId": { "type": "string", "maxLength": 128 },
+        "mpesaReceiptNumber": { "type": "string", "maxLength": 64 },
+        "customerSubmittedRef": { "type": "string", "maxLength": 64 },
+        "resultCode": { "type": "string", "maxLength": 32 },
+        "resultDesc": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "orderId", "orderRef", "method", "amountKes", "status", "createdAt", "updatedAt"]
+    },
+    "SupplierTransaction": {
+      "title": "SupplierTransaction",
+      "description": "Automated bundle/airtime supplier fulfillment attempt.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "orderRef": { "type": "string", "maxLength": 32 },
+        "recipientPhone": { "type": "string", "maxLength": 15 },
+        "supplierSku": { "type": "string", "maxLength": 80 },
+        "amountKes": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending_configuration", "processing", "delivered", "failed"] },
+        "supplierReference": { "type": "string", "maxLength": 128 },
+        "responseMessage": { "type": "string", "maxLength": 400 },
+        "attemptNumber": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "orderId", "orderRef", "recipientPhone", "supplierSku", "amountKes", "status", "attemptNumber", "createdAt", "updatedAt"]
+    },
+    "PaymentCallbackRecord": {
+      "title": "PaymentCallbackRecord",
+      "description": "Idempotent raw Daraja STK/C2B callback ledger.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "callbackType": { "type": "string", "enum": ["stk_callback", "c2b_validation", "c2b_confirmation"] },
+        "idempotencyKey": { "type": "string", "maxLength": 128 },
+        "checkoutRequestId": { "type": "string", "maxLength": 128 },
+        "transId": { "type": "string", "maxLength": 64 },
+        "amountKes": { "type": "number" },
+        "resultCode": { "type": "string", "maxLength": 32 },
+        "processed": { "type": "boolean" },
+        "receivedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "callbackType", "idempotencyKey", "processed", "receivedAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized SafBundle administrator record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 160 },
+        "role": { "type": "string", "enum": ["admin", "super_admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "BusinessPaymentConfig": {
+      "title": "BusinessPaymentConfig",
+      "description": "Publicly readable non-secret Till/Paybill and customer support settings.",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string", "maxLength": 100 },
+        "paymentMode": { "type": "string", "enum": ["till", "paybill"] },
+        "tillNumber": { "type": "string", "maxLength": 20 },
+        "paybillNumber": { "type": "string", "maxLength": 20 },
+        "accountPrefix": { "type": "string", "maxLength": 20 },
+        "stkPushEnabled": { "type": "boolean" },
+        "tillPaybillEnabled": { "type": "boolean" },
+        "supportPhone": { "type": "string", "maxLength": 30 },
+        "supportWhatsapp": { "type": "string", "maxLength": 30 },
+        "supportEmail": { "type": "string", "maxLength": 120 },
+        "sampleNotice": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["businessName", "paymentMode", "stkPushEnabled", "tillPaybillEnabled", "supportEmail"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Customer inquiry or support ticket submitted through Contact Us.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketRef": { "type": "string", "minLength": 6, "maxLength": 32 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "email": { "type": "string", "minLength": 5, "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 25 },
+        "topic": { "type": "string", "enum": ["order_issue", "mpesa_payment", "bundle_delivery", "partnership", "general"] },
+        "orderRef": { "type": "string", "maxLength": 32 },
+        "message": { "type": "string", "minLength": 10, "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
+        "adminNotes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ticketRef", "name", "email", "topic", "message", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Catalog of Safaricom data bundles and airtime packages."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer profiles containing PII (phone numbers); admin/server only."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer bundle and airtime orders; server/admin only due to PII."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "M-Pesa payment records; server/admin only."
+    },
+    "/supplierTransactions/{txId}": {
+      "schema": { "$ref": "#/entities/SupplierTransaction" },
+      "description": "Automated supplier fulfillment records; server/admin only."
+    },
+    "/paymentCallbackRecords/{callbackId}": {
+      "schema": { "$ref": "#/entities/PaymentCallbackRecord" },
+      "description": "Idempotent Daraja webhook callback logs; server/admin only."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Authorized admin UIDs."
+    },
+    "/settings/paymentConfig": {
+      "schema": { "$ref": "#/entities/BusinessPaymentConfig" },
+      "description": "Non-secret public payment display and support settings."
+    },
+    "/contactMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "Customer Contact Us inquiries and support tickets; admin/server only due to PII."
+    }
+  }
+}

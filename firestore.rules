@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'joehennry33@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['id', 'name', 'category', 'priceKes', 'supplierSku', 'isActive', 'sortOrder'])
+        && data.keys().hasOnly([
+          'id', 'name', 'category', 'dataAllocation', 'validityLabel',
+          'description', 'priceKes', 'supplierSku', 'isActive',
+          'isFeatured', 'isSample', 'sortOrder', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 120
+        && data.category in ['daily', 'weekly', 'monthly', 'special', 'airtime']
+        && (!('dataAllocation' in data) || (data.dataAllocation is string && data.dataAllocation.size() <= 64))
+        && (!('validityLabel' in data) || (data.validityLabel is string && data.validityLabel.size() <= 64))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 400))
+        && data.priceKes is number && data.priceKes >= 1 && data.priceKes <= 100000
+        && data.supplierSku is string && data.supplierSku.size() >= 2 && data.supplierSku.size() <= 80
+        && data.isActive is bool
+        && (!('isFeatured' in data) || data.isFeatured is bool)
+        && (!('isSample' in data) || data.isSample is bool)
+        && data.sortOrder is number && data.sortOrder >= 0 && data.sortOrder <= 10000
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
+    }
+
+    function isValidPaymentConfig(data) {
+      return data.keys().hasAll(['businessName', 'paymentMode', 'stkPushEnabled', 'tillPaybillEnabled', 'supportEmail'])
+        && data.keys().hasOnly([
+          'businessName', 'paymentMode', 'tillNumber', 'paybillNumber',
+          'accountPrefix', 'stkPushEnabled', 'tillPaybillEnabled',
+          'supportPhone', 'supportWhatsapp', 'supportEmail', 'sampleNotice', 'updatedAt'
+        ])
+        && data.businessName is string && data.businessName.size() >= 2 && data.businessName.size() <= 100
+        && data.paymentMode in ['till', 'paybill']
+        && (!('tillNumber' in data) || (data.tillNumber is string && data.tillNumber.size() <= 20))
+        && (!('paybillNumber' in data) || (data.paybillNumber is string && data.paybillNumber.size() <= 20))
+        && (!('accountPrefix' in data) || (data.accountPrefix is string && data.accountPrefix.size() <= 20))
+        && data.stkPushEnabled is bool
+        && data.tillPaybillEnabled is bool
+        && (!('supportPhone' in data) || (data.supportPhone is string && data.supportPhone.size() <= 30))
+        && (!('supportWhatsapp' in data) || (data.supportWhatsapp is string && data.supportWhatsapp.size() <= 30))
+        && data.supportEmail is string && data.supportEmail.size() >= 5 && data.supportEmail.size() <= 120
+        && (!('sampleNotice' in data) || (data.sampleNotice is string && data.sampleNotice.size() <= 300))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
+    }
+
+    // Public catalog of bundles and airtime; writes strictly restricted to verified Admins
+    match /products/{productId} {
+      allow get: if isValidId(productId) && (existing().isActive == true || isAdmin());
+      allow list: if resource.data.isActive == true || isAdmin();
+      allow create: if isValidId(productId) && isAdmin() && isValidProduct(incoming()) && incoming().id == productId;
+      allow update: if isValidId(productId) && isAdmin() && isValidProduct(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(productId) && isAdmin();
+    }
+
+    // Public non-secret business Till/Paybill & support configuration
+    match /settings/{settingId} {
+      allow get: if settingId == 'paymentConfig' || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if settingId == 'paymentConfig' && isAdmin() && isValidPaymentConfig(incoming());
+      allow delete: if false;
+    }
+
+    // Admin roster: readable by self or admin; managed exclusively via server Admin SDK
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // PII & transactional collections: strictly server-side Admin SDK writes; admin-only reads
+    match /customers/{customerId} {
+      allow get: if isValidId(customerId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /supplierTransactions/{txId} {
+      allow get: if isValidId(txId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /paymentCallbackRecords/{callbackId} {
+      allow get: if isValidId(callbackId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /contactMessages/{messageId} {
+      allow get: if isValidId(messageId) && isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
