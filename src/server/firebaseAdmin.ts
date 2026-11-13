@@ -1,14 +1,31 @@
 import type { NextFunction, Request, Response } from 'express';
-import { getApps, initializeApp } from 'firebase-admin/app';
+import { cert, getApps, initializeApp, type AppOptions } from 'firebase-admin/app';
 import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../../firebase-applet-config.json' with { type: 'json' };
 
-const adminApp = getApps().length
-  ? getApps()[0]
-  : initializeApp({
-      projectId: firebaseConfig.projectId,
-    });
+function buildAdminOptions(): AppOptions {
+  const rawCreds = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  if (rawCreds) {
+    try {
+      const parsed = JSON.parse(rawCreds);
+      return {
+        credential: cert(parsed),
+        projectId: firebaseConfig.projectId,
+      };
+    } catch (err) {
+      console.warn(
+        'Invalid FIREBASE_SERVICE_ACCOUNT_JSON format; falling back to default credentials.',
+        err,
+      );
+    }
+  }
+  return {
+    projectId: firebaseConfig.projectId,
+  };
+}
+
+const adminApp = getApps().length ? getApps()[0] : initializeApp(buildAdminOptions());
 
 export const adminAuth = getAuth(adminApp);
 export const adminDb = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);

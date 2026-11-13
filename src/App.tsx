@@ -1,3 +1,4 @@
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { CheckoutView } from './components/CheckoutView.tsx';
@@ -6,7 +7,13 @@ import { Footer } from './components/Footer.tsx';
 import { HomeView } from './components/HomeView.tsx';
 import { Navbar, type AppView } from './components/Navbar.tsx';
 import { TrackOrderView } from './components/TrackOrderView.tsx';
-import { testFirestoreConnection } from './lib/firebase.ts';
+import {
+  db,
+  handleFirestoreError,
+  OperationType,
+  testFirestoreConnection,
+} from './lib/firebase.ts';
+import { DEFAULT_PAYMENT_CONFIG, SAMPLE_PRODUCTS } from './lib/sampleCatalog.ts';
 import type {
   BusinessPaymentConfig,
   IntegrationStatus,
@@ -20,6 +27,55 @@ function resolveViewFromPath(pathname: string): AppView {
   if (pathname.startsWith('/contact')) return 'contact';
   if (pathname.startsWith('/checkout')) return 'checkout';
   return 'home';
+}
+
+async function fetchJsonSafely<T>(url: string): Promise<T | null> {
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.toLowerCase().includes('application/json')) {
+      return null;
+    }
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function loadCatalogFromFirestore(): Promise<{
+  products: Product[];
+  config: BusinessPaymentConfig | null;
+}> {
+  let products: Product[] = [];
+  let config: BusinessPaymentConfig | null = null;
+
+  try {
+    const prodQuery = query(collection(db, 'products'), where('isActive', '==', true));
+    const snap = await getDocs(prodQuery);
+    products = snap.docs
+      .map((d) => d.data() as Product)
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.toLowerCase().includes('permission')) {
+      handleFirestoreError(err, OperationType.LIST, 'products');
+    }
+    throw err;
+  }
+
+  try {
+    const cfgSnap = await getDoc(doc(db, 'settings', 'paymentConfig'));
+    if (cfgSnap.exists()) {
+      config = cfgSnap.data() as BusinessPaymentConfig;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.toLowerCase().includes('permission')) {
+      handleFirestoreError(err, OperationType.GET, 'settings/paymentConfig');
+    }
+  }
+
+  return { products, config };
 }
 
 export default function App() {
@@ -56,22 +112,39 @@ export default function App() {
     async function loadInitialData() {
       setLoadingProducts(true);
       try {
-        const [prodRes, cfgRes] = await Promise.all([
-          fetch('/api/products'),
-          fetch('/api/config/public'),
+        const [prodData, cfgData] = await Promise.all([
+          fetchJsonSafely<{ products?: Product[] }>('/api/products'),
+          fetchJsonSafely<{
+            config?: BusinessPaymentConfig;
+            integrations?: IntegrationStatus;
+          }>('/api/config/public'),
         ]);
 
-        if (!prodRes.ok) {
-          throw new Error('Could not load bundle catalog.');
+        if (prodData && Array.isArray(prodData.products)) {
+          if (!cancelled) {
+            setProducts(prodData.products);
+            setConfig(cfgData?.config || DEFAULT_PAYMENT_CONFIG);
+            setIntegrations(cfgData?.integrations || null);
+            setProductsError(null);
+          }
+          return;
         }
 
-        const prodData = await prodRes.json();
-        const cfgData = cfgRes.ok ? await cfgRes.json() : {};
+        // Fallback to direct Firestore Client SDK if /api/* backend is unavailable (e.g., static deploy)
+        let firestoreProducts: Product[] = [];
+        let firestoreConfig: BusinessPaymentConfig | null = null;
+        try {
+          const fsResult = await loadCatalogFromFirestore();
+          firestoreProducts = fsResult.products;
+          firestoreConfig = fsResult.config;
+        } catch (fsErr) {
+          console.warn('Firestore client catalog fallback failed, using sample catalog:', fsErr);
+        }
 
         if (!cancelled) {
-          setProducts(prodData.products || []);
-          setConfig(cfgData.config || null);
-          setIntegrations(cfgData.integrations || null);
+          setProducts(firestoreProducts.length > 0 ? firestoreProducts : SAMPLE_PRODUCTS);
+          setConfig(firestoreConfig || cfgData?.config || DEFAULT_PAYMENT_CONFIG);
+          setIntegrations(cfgData?.integrations || null);
           setProductsError(null);
         }
       } catch (err) {
